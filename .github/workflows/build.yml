@@ -4,11 +4,13 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
     - name: Compile C++
       run: cl.exe /EHsc /O2 locker.cpp /link user32.lib gdi32.lib /OUT:locker.exe /SUBSYSTEM:WINDOWS
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Locker-EXE
         path: locker.exe
