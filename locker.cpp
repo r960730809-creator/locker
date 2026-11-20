@@ -70,7 +70,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             last_timer_tick = GetTickCount();
         }
         
-        // Постоянная перерисовка для мигающего Enter
         if (is_bsod) {
             InvalidateRect(hwnd, NULL, TRUE);
         }
@@ -146,11 +145,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             DeleteObject(blueBrush);
             
             SetBkMode(hdc, TRANSPARENT);
-            HFONT font = CreateFontW(24, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
+            HFONT font = CreateFontW(16, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
             SelectObject(hdc, font);
 
             // Верхняя плашка
-            RECT whiteRect = {cx - 550, cy - 320, cx + 550, cy - 270};
+            RECT whiteRect = {cx - 400, cy - 250, cx + 400, cy - 220};
             HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
             FillRect(hdc, &whiteRect, whiteBrush);
             DeleteObject(whiteBrush);
@@ -159,7 +158,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             
             // Основной текст
             SetTextColor(hdc, RGB(255, 255, 255));
-            RECT textRect = {cx - 550, cy - 200, cx + 550, cy + 50};
+            RECT textRect = {cx - 400, cy - 200, cx + 400, cy + 50};
             const wchar_t* bsod_text = 
                 L"\u0423\u043f\u0441! \u0412\u044b \u043f\u043e\u0434\u0432\u0435\u0440\u0433\u043b\u0438\u0441\u044c \u043c\u0430\u0441\u0448\u0442\u0430\u0431\u043d\u043e\u0439 \u0445\u0430\u043a\u0435\u0440\u0441\u043a\u043e\u0439 \u0430\u0442\u0430\u043a\u0435 \u0438 \u0442\u0435\u043f\u0435\u0440\u044c \u0412\u0430\u0448 \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\n"
                 L"\u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d, \u0430 \u0432\u0441\u0435 \u0438\u043c\u0435\u044e\u0449\u0438\u0435\u0441\u044f \u0434\u0438\u0441\u043a\u0438 \u0438 \u0444\u0430\u0439\u043b\u044b \u043d\u0430 \u043d\u0438\u0445 \u0437\u0430\u0448\u0438\u0444\u0440\u043e\u0432\u0430\u043d\u044b \u0445\u0430\u043a\u0435\u0440\u0441\u043a\u043e\u0439\n"
@@ -174,7 +173,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             DrawTextW(hdc, bsod_text, -1, &textRect, DT_LEFT | DT_WORDBREAK);
             
             // Поле ввода
-            RECT inputRect = {cx - 550, cy + 100, cx + 550, cy + 150};
+            RECT inputRect = {cx - 400, cy + 100, cx + 400, cy + 130};
             HBRUSH inputBrush = CreateSolidBrush(RGB(255, 255, 255));
             FillRect(hdc, &inputRect, inputBrush);
             DeleteObject(inputBrush);
@@ -183,47 +182,42 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             std::wstring display = L"\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0434 \u0440\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438: " + input_text;
             DrawTextW(hdc, display.c_str(), -1, &inputRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-            // Имя ПК
+            // Имя ПК (снизу слева)
             SetTextColor(hdc, RGB(255, 255, 255));
-            RECT bottomRect = {50, rect.bottom - 150, 800, rect.bottom - 110};
+            RECT bottomRect = {cx - 400, cy + 140, cx, cy + 160};
             std::wstring bottom = L"Current PC: " + pc_name;
             DrawTextW(hdc, bottom.c_str(), -1, &bottomRect, DT_LEFT);
-            
-            // ТАЙМЕР (СДЕЛАЛ ЧЕРНЫМ)
+
+            // ОГРОМНЫЙ БЕЛЫЙ ТАЙМЕР (снизу по центру)
             int hrs = time_left / 3600;
             int mins = (time_left % 3600) / 60;
             int secs = time_left % 60;
             wchar_t timer_buf[100];
             swprintf_s(timer_buf, L"\u041e\u0421\u0422\u0410\u041b\u041e\u0421\u042c \u0412\u0420\u0415\u041c\u0415\u041d\u0418: %02d:%02d:%02d", hrs, mins, secs);
             
-            HFONT fontTimer = CreateFontW(36, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
+            HFONT fontTimer = CreateFontW(40, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
             SelectObject(hdc, fontTimer);
-            SetTextColor(hdc, RGB(0, 0, 0)); // Черный цвет
-            RECT timerRect = {50, rect.bottom - 100, 800, rect.bottom - 40};
-            DrawTextW(hdc, timer_buf, -1, &timerRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            SetTextColor(hdc, RGB(255, 255, 255)); // Белый цвет
+            RECT timerRect = {cx - 400, rect.bottom - 120, cx + 400, rect.bottom - 40};
+            DrawTextW(hdc, timer_buf, -1, &timerRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            // МИГАЮЩИЙ ENTER (В ПРАВОМ НИЖНЕМ УГЛУ)
+            // МИГАЮЩИЙ ENTER (снизу справа)
             if ((GetTickCount() / 500) % 2 == 0) {
+                HFONT fontEnter = CreateFontW(20, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
+                SelectObject(hdc, fontEnter);
                 SetTextColor(hdc, RGB(255, 255, 255));
-                RECT enterRect = {rect.right - 300, rect.bottom - 100, rect.right - 50, rect.bottom - 40};
+                RECT enterRect = {cx + 100, cy + 140, cx + 400, cy + 160};
                 DrawTextW(hdc, L"Enter [\u0412\u0412\u041e\u0414]", -1, &enterRect, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+                DeleteObject(fontEnter);
             }
 
-            // Окно ошибки (СДЕЛАЛ АККУРАТНЕЕ)
+            // Окно ошибки
             if (show_error) {
-                // Тень
-                RECT shadowRect = {cx - 302, cy - 52, cx + 302, cy + 52};
-                HBRUSH shadowBrush = CreateSolidBrush(RGB(100, 0, 0));
-                FillRect(hdc, &shadowRect, shadowBrush);
-                DeleteObject(shadowBrush);
-
-                // Само окно
                 RECT errRect = {cx - 300, cy - 50, cx + 300, cy + 50};
-                HBRUSH redBrush = CreateSolidBrush(RGB(170, 0, 0)); // Темно-красный
+                HBRUSH redBrush = CreateSolidBrush(RGB(170, 0, 0)); 
                 FillRect(hdc, &errRect, redBrush);
                 DeleteObject(redBrush);
                 
-                // Белая рамка
                 HBRUSH frameBrush = CreateSolidBrush(RGB(255, 255, 255));
                 FrameRect(hdc, &errRect, frameBrush);
                 DeleteObject(frameBrush);
