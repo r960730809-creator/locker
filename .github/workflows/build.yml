@@ -1,0 +1,14 @@
+name: Build Windows EXE
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Compile C++
+      run: cl.exe /EHsc /O2 locker.cpp /link user32.lib gdi32.lib /OUT:locker.exe /SUBSYSTEM:WINDOWS
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Locker-EXE
+        path: locker.exe
